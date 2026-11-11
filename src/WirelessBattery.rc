@@ -1,0 +1,23 @@
+#pragma code_page(65001)
+#include <windows.h>
+#include <commctrl.h>
+#include "resource.h"
+
+IDD_OPTIONS DIALOGEX 0, 0, 250, 112
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | DS_SETFOREGROUND | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "无线设备电量 - 选项"
+FONT 9, "Microsoft YaHei UI", 400, 0, 0x86
+BEGIN
+    LTEXT           "显示样式：", -1, 10, 14, 48, 10
+    COMBOBOX        IDC_STYLE, 60, 12, 180, 60, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "轮询间隔：", -1, 10, 37, 48, 10
+    EDITTEXT        IDC_POLL, 60, 35, 52, 13, ES_NUMBER | ES_AUTOHSCROLL | WS_TABSTOP
+    CONTROL         "", IDC_POLL_SPIN, UPDOWN_CLASS,
+                    UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_AUTOBUDDY | UDS_ARROWKEYS | UDS_NOTHOUSANDS,
+                    0, 0, 0, 0
+    LTEXT           "秒（10 ~ 3600）", -1, 118, 37, 100, 10
+    LTEXT           "轮询只读取接收器缓存的电量，不会唤醒鼠标/键盘，\n间隔调短也不会增加设备耗电。",
+                    -1, 10, 58, 230, 20
+    DEFPUSHBUTTON   "确定", IDOK, 136, 88, 50, 15
+    PUSHBUTTON      "取消", IDCANCEL, 190, 88, 50, 15
+END
