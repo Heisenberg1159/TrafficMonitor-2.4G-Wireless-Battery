@@ -7,4 +7,5 @@
 #include "battery_protocols.h"
 
 std::unique_ptr<BatteryProvider> CreateCompxMouseProvider();
+std::unique_ptr<BatteryProvider> CreateLogitechMouseProvider();
 std::unique_ptr<BatteryProvider> CreateMchoseKeyboardProvider();

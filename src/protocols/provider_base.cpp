@@ -25,7 +25,7 @@ BatteryReading ProviderBase::Poll() {
         HidConnection conn;
         if (conn.Open(path_)) {
             BatteryReading r = Query(conn);
-            r.deviceName = name_;
+            if (r.deviceName.empty()) r.deviceName = name_;
             if (r.state == LinkState::NoAnswer && conn.LastError() != WAIT_TIMEOUT) {
                 path_.clear();  // hard I/O error: device probably re-enumerated
             }
