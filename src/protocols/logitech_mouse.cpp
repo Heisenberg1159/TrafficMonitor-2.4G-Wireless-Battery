@@ -37,26 +37,30 @@ class LogitechMouseProvider : public ProviderBase {
     USHORT VendorId() const override { return kVid; }
 
     bool Matches(const HidInterfaceInfo& i) const override {
-        return i.usagePage == 0xFF00 && i.inputLen == kLen && i.outputLen >= kLen;
+        return i.usagePage == 0xFF00 && i.inputLen == kLen && i.outputLen == kLen;
     }
 
     // One HID++ request/reply. Returns the 16-byte payload length on success,
-    // -1 on timeout / write failure, -2 on a HID++ error frame.
+    // -1 on timeout, -2 on a HID++ error frame, -3 on hard I/O error.
     int Transact(HidConnection& conn, int dev, int featureIndex, int function,
                  const unsigned char* params, int paramsLen, unsigned char* payload) {
         unsigned char req[kLen] = {kReportId, static_cast<unsigned char>(dev),
                                    static_cast<unsigned char>(featureIndex),
                                    static_cast<unsigned char>((function & 0xF0) | kSwId)};
-        if (paramsLen > 0) memcpy(req + 4, params, static_cast<size_t>(paramsLen));
+        if (paramsLen > 0 && paramsLen <= static_cast<int>(kLen - 4)) {
+            memcpy(req + 4, params, static_cast<size_t>(paramsLen));
+        }
         conn.FlushInput();
-        if (!conn.SetOutputReport(req, kLen) && !conn.Write(req, kLen, kWriteTimeoutMs)) return -1;
+        if (!conn.SetOutputReport(req, kLen) && !conn.Write(req, kLen, kWriteTimeoutMs)) return -3;
         unsigned char reply[kLen] = {};
         int n = ReadMatching(conn, reply, kLen, [dev, featureIndex](const unsigned char* p, int len) {
             if (len != static_cast<int>(kLen) || p[0] != kReportId) return false;
             if (p[1] != dev && p[1] != (dev ^ 0xFF)) return false;
-            if (p[2] == 0x8F || p[2] == 0xFF) return true;  // error frame, caller inspects
+            if (p[2] == 0xFF) return p[3] == featureIndex && (p[4] & 0x0F) == kSwId;
+            if (p[2] == 0x8F) return p[3] == featureIndex;
             return p[2] == featureIndex && (p[3] & 0x0F) == kSwId;
         });
+        if (n < 0) return -3;
         if (n != static_cast<int>(kLen)) return -1;
         if (reply[2] == 0x8F || reply[2] == 0xFF) return -2;
         memcpy(payload, reply + 4, kLen - 4);
@@ -75,6 +79,11 @@ class LogitechMouseProvider : public ProviderBase {
     bool ReadBattery(HidConnection& conn, int dev, BatteryReading& r) {
         unsigned char payload[kLen - 4] = {};
         int n = Transact(conn, dev, batteryIdx_, 0, nullptr, 0, payload);
+        if (n == -3) {
+            r.state = LinkState::NoAnswer;
+            r.detail = L"battery: i/o error";
+            return false;
+        }
         if (n < 0) {
             // Receiver rejected the request or went silent: the mouse is
             // offline / fell asleep between the two requests.
@@ -90,7 +99,7 @@ class LogitechMouseProvider : public ProviderBase {
         r.state = LinkState::Online;
         r.level = payload[0];
         const int status = payload[2];
-        r.charging = status != 0 && status != 3 && status != 5 && status != 6 && status != 7;
+        r.charging = status == 1 || status == 2 || status == 4;
         return true;
     }
 
@@ -130,6 +139,11 @@ class LogitechMouseProvider : public ProviderBase {
             bool sawError = false;
             for (int d : kDevNums) {
                 int idx = FeatureIndex(conn, d, 0x1000);
+                if (idx == -3) {
+                    r.state = LinkState::NoAnswer;
+                    r.detail = L"i/o error";
+                    return r;
+                }
                 if (idx == -2) {
                     sawError = true;
                     continue;
@@ -150,7 +164,7 @@ class LogitechMouseProvider : public ProviderBase {
             }
         }
         if (!ReadBattery(conn, dev, r)) {
-            cachedDev_ = -1;  // stale route: re-probe on the next poll
+            ResetCache();  // stale route or swapped device: re-probe on the next poll
             return r;
         }
         cachedDev_ = dev;
@@ -158,6 +172,14 @@ class LogitechMouseProvider : public ProviderBase {
         if (GetTickCount64() - start < 500) ReadVoltage(conn, dev, r);
         if (GetTickCount64() - start < 500) ReadName(conn, dev, r);
         return r;
+    }
+
+    void ResetCache() {
+        cachedDev_ = -1;
+        batteryIdx_ = 0;
+        voltageIdx_ = -1;
+        nameIdx_ = -1;
+        deviceName_.clear();
     }
 
     int cachedDev_ = -1;

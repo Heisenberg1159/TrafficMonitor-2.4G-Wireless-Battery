@@ -88,6 +88,11 @@ Normal mouse-move / key-press reports carry no battery information, and these re
 standard HID battery usage. That is why each receiver family needs its own small protocol driver in
 [`src/protocols/`](src/protocols).
 
+Note on Logitech Lightspeed: HID++ battery features are answered by the mouse itself (over the radio while awake,
+~10–30 ms per request). While the mouse sleeps, the receiver rejects/ignores the request without waking it. The
+G304 uses an AA cell; its percentage is taken directly from feature `0x1000` without voltage-curve estimation,
+and the model does not report voltage or charging state.
+
 ## Add your own device
 
 You do not need to touch the plugin, UI or threading code. A device is supported by one **provider**: a class
@@ -158,7 +163,7 @@ No code from these projects is included. This plugin is an independent C++ imple
 [MIT](LICENSE) © 2026 [Heisenberg1159](https://github.com/Heisenberg1159) and contributors. `src/PluginInterface.h` is part of TrafficMonitor and is distributed under its own license.
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-This is an unofficial project, not affiliated with or endorsed by VGN, MCHOSE, Compx, Pulsar or any other vendor.
+This is an unofficial project, not affiliated with or endorsed by VGN, MCHOSE, Compx, Pulsar, Logitech or any other vendor.
 All product names and trademarks belong to their owners.
 
 [pulsar]: https://github.com/andrewrabert/python-pulsar-mouse-tool
