@@ -16,6 +16,7 @@ add_library(battery_core STATIC
     src/protocols/registry.cpp
     # One file per receiver protocol - add yours here.
     src/protocols/compx_mouse.cpp
+    src/protocols/logitech_mouse.cpp
     src/protocols/mchose_keyboard.cpp)
 target_include_directories(battery_core PUBLIC src src/protocols)
 target_link_libraries(battery_core PUBLIC hid setupapi)
