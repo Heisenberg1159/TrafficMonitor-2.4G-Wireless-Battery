@@ -7,7 +7,6 @@ namespace {
 
 constexpr wchar_t kSection[] = L"config";
 constexpr LONGLONG kMaxLogBytes = 256 * 1024;
-constexpr DWORD kFirstReadingRetryMs = 10 * 1000;
 
 const wchar_t* KindName(int i) { return i == 0 ? L"mouse" : L"keyboard"; }
 
@@ -28,21 +27,36 @@ void EnsureUnicodeIni(const std::wstring& path) {
     HANDLE h = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (h == INVALID_HANDLE_VALUE) return;
     const wchar_t text[] =
-        L"﻿; 无线设备电量插件配置。显示样式和轮询间隔可在插件的\"选项\"对话框中修改；\r\n"
-        L"; 直接编辑本文件后，右键菜单选择\"立即刷新电量\"生效\r\n"
+        L"﻿; ============================================================\r\n"
+        L";  WirelessBattery 无线设备电量插件 · 配置文件\r\n"
+        L";  改完保存后：右键任务栏电量项 →「立即刷新电量」生效\r\n"
+        L";  显示样式和轮询间隔也可以直接在插件「选项」对话框里改\r\n"
+        L"; ============================================================\r\n"
+        L"\r\n"
         L"[config]\r\n"
-        L"; 显示样式：icon = 图标（设备图标 + 电池 + 百分比），text = 纯文字\r\n"
-        L"display_style=icon\r\n"
-        L"; 轮询间隔（秒，10~3600）。接收器直接返回缓存值，不会唤醒鼠标/键盘。\r\n"
-        L"poll_interval_sec=60\r\n"
-        L"; 低电量提醒阈值（%），0 表示不提醒\r\n"
-        L"low_battery_warn=20\r\n"
-        L"; 充电中时数值后追加的标记\r\n"
-        L"charging_mark=⚡\r\n"
-        L"; 设备休眠/离线时（显示上次读数）数值后追加的标记，默认不追加\r\n"
-        L"sleep_mark=\r\n"
-        L"; 1 = 把每次轮询结果写入 WirelessBattery.log，用于排查问题\r\n"
-        L"debug_log=0\r\n";
+        L"\r\n"
+        L"; ---- 显示 ----\r\n"
+        L"; 显示样式：icon = 设备图标 + 电池 + 百分比；text = 纯文字 + 百分比\r\n"
+        L"display_style = icon\r\n"
+        L"\r\n"
+        L"; 充电时百分比后面追加的小标记（不想追加就留空）\r\n"
+        L"charging_mark = ⚡\r\n"
+        L"\r\n"
+        L"; 鼠标休眠/离线时百分比后面追加的小标记（默认留空，数值整体变暗）\r\n"
+        L"sleep_mark =\r\n"
+        L"\r\n"
+        L"; ---- 刷新 ----\r\n"
+        L"; 常规轮询间隔，单位秒，范围 10~3600，默认 60\r\n"
+        L"; 只读取上报值，不唤醒设备；拔插/无读数时另有内置 3 秒快重试\r\n"
+        L"poll_interval_sec = 60\r\n"
+        L"\r\n"
+        L"; ---- 提醒 ----\r\n"
+        L"; 电量降到该百分比时弹一次系统通知，默认 20；填 0 关闭提醒\r\n"
+        L"low_battery_warn = 20\r\n"
+        L"\r\n"
+        L"; ---- 排查 ----\r\n"
+        L"; 填 1 时把每次轮询结果写入同目录 WirelessBattery.log；平时保持 0\r\n"
+        L"debug_log = 0\r\n";
     DWORD written = 0;
     WriteFile(h, text, static_cast<DWORD>((sizeof(text) - sizeof(wchar_t))), &written, nullptr);
     CloseHandle(h);
@@ -130,11 +144,11 @@ void BatteryMonitor::Run() {
         PollOnce();
         DWORD waitMs = static_cast<DWORD>(Config().pollSeconds) * 1000;
         {
-            // Receiver present but no reading yet (e.g. mouse asleep at startup):
-            // retry sooner so the value shows up quickly.
+            // No reading yet (receiver absent, or mouse asleep at startup):
+            // retry soon so plug/unplug and wake-up show up within seconds.
             std::lock_guard<std::mutex> lock(mutex_);
             for (const auto& s : status_) {
-                if (s.state != LinkState::NotFound && !s.hasReading) waitMs = std::min<DWORD>(waitMs, kFirstReadingRetryMs);
+                if (!s.hasReading) waitMs = std::min<DWORD>(waitMs, 3000);
             }
         }
         DWORD w = WaitForMultipleObjects(2, events, FALSE, waitMs);

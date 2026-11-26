@@ -170,8 +170,8 @@ public:
         switch (index) {
             case TMI_NAME: return L"无线设备电量";
             case TMI_DESCRIPTION:
-                return L"显示 2.4G 无线鼠标（Compx 方案，如 VGN F1 系列）和键盘（迈从 K99 V3 等）的电量。"
-                       L"直接查询接收器缓存，不唤醒设备、不增加功耗。";
+                return L"显示 2.4G 无线鼠标（Compx 方案如 VGN F1 系列、罗技 Lightspeed 如 G304）"
+                       L"和键盘（迈从 K99 V3 等）的电量。只发读命令，不唤醒休眠中的设备。";
             case TMI_AUTHOR: return L"Heisenberg1159";
             case TMI_COPYRIGHT: return L"Copyright (C) 2026 Heisenberg1159 and contributors";
             case TMI_VERSION: return L"1.1.0";
